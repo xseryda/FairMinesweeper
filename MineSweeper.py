@@ -17,9 +17,9 @@ class GameField(QtWidgets.QWidget):
 
         self.width = 10
         self.height = 10
-        self.mines = 20
-        self.determinable = 0
+        self.mines = 10
         self.remainingMines = 0
+        self.showDeterminable = True
 
         # Time counters #
         self.s = 0
@@ -30,6 +30,7 @@ class GameField(QtWidgets.QWidget):
         self.gameStructure = gameStructure
         self.dataList = gameStructure.matrix
         self.visibleList = gameStructure.visibleMatrix
+        self.determinableList = gameStructure.determinableMatrix
 
         self.setWindowTitle("Fair minesweeper")
 
@@ -70,7 +71,7 @@ class GameField(QtWidgets.QWidget):
         rightLayout.addLayout(remainingLayout)
 
         # -----------Possible to determine -----------------#
-        self.labelPossible = QtWidgets.QLabel('Possible to determine {} boxes'.format(self.determinable))
+        self.labelPossible = QtWidgets.QLabel('Possible to determine {} boxes'.format(self.gameStructure.determinable))
         rightLayout.addWidget(self.labelPossible)
         buttonPossible = QtWidgets.QPushButton('Show determinable boxes')
         rightLayout.addWidget(buttonPossible)
@@ -101,7 +102,7 @@ class GameField(QtWidgets.QWidget):
         self.rowsWidget.setMaxLength(2)
         self.rowsWidget.setFixedWidth(26)
         self.rowsWidget.setFont(font)
-        self.rowsWidget.setText('15')
+        self.rowsWidget.setText('10')
         labelx = QtWidgets.QLabel(' x ')
         labelx.setFont(font)
         self.columnsWidget = QtWidgets.QLineEdit()
@@ -109,7 +110,7 @@ class GameField(QtWidgets.QWidget):
         self.columnsWidget.setMaxLength(2)
         self.columnsWidget.setFixedWidth(26)
         self.columnsWidget.setFont(font)
-        self.columnsWidget.setText('15')
+        self.columnsWidget.setText('10')
         sizesLayout = QtWidgets.QHBoxLayout()
         sizesLayout.addWidget(label)
         sizesLayout.addWidget(self.rowsWidget)
@@ -124,7 +125,7 @@ class GameField(QtWidgets.QWidget):
         self.minesWidget.setMaxLength(3)
         self.minesWidget.setFixedWidth(40)
         self.minesWidget.setFont(font)
-        self.minesWidget.setText('30')
+        self.minesWidget.setText('20')
         minesLayout = QtWidgets.QHBoxLayout()
         minesLayout.addWidget(labelMines)
         minesLayout.addWidget(self.minesWidget)
@@ -141,7 +142,8 @@ class GameField(QtWidgets.QWidget):
         # self.parent.adjustSize()
 
     def initiateGameField(self):
-        self.tableModel = MyTableModel(self, self.visibleList, self.dataList)
+        self.messy = False
+        self.tableModel = MyTableModel(self, self.visibleList, self.dataList, self.determinableList)
         self.tableView.setModel(self.tableModel)
 
         for i in range(len(self.visibleList[0])):
@@ -151,12 +153,12 @@ class GameField(QtWidgets.QWidget):
         self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
 
-        x, y = self.tableView.sizeHint().width(), self.tableView.sizeHint().height()
-        # print (x,y)
+        # x, y = self.tableView.sizeHint().width(), self.tableView.sizeHint().height()
+        # print (self.width,self.height)
         # Rewrite sizeHint function to return modified values?
         # self.parent.resize()
 
-        self.parent.setFixedSize((self.width+1)*30 + 225, (self.height+1)*30 + 18)
+        self.parent.setFixedSize((self.width+1)*30 + 225, (self.height+1)*30 + 18) # needed e.g. for making the field smaller
         # self.parent.setFixedSize(x + 225, y + 18)
         # self.parent.setFixedSize(x + 50, y + 18)
 
@@ -235,6 +237,9 @@ class GameField(QtWidgets.QWidget):
         if os.path.isfile('savedPosition.FMS'):
             (dataList, visibleList, self.mines, self.width, self.height, self.remainingMines, self.h, self.m,
              self.s) = pickle.load(open('savedPosition.FMS', 'rb'))
+            self.rowsWidget.setText(str(self.height))
+            self.columnsWidget.setText(str(self.width))
+            self.minesWidget.setText(str(self.mines))
         self.gameStructure.load(dataList, visibleList, self.mines)
         self.start(load=True)
         self.messy = False
@@ -265,6 +270,7 @@ class GameField(QtWidgets.QWidget):
                     self.remaining.setText(self.remainingMines)
                 self.dataList = self.gameStructure.matrix
                 self.visibleList = self.gameStructure.visibleMatrix
+                self.determinableList = self.gameStructure.determinableMatrix
                 self.initiateGameField()
 
         except Exception as e:
@@ -387,12 +393,14 @@ class NewRecordDialog(QtWidgets.QDialog):
 
 
 class MyTableModel(QtCore.QAbstractTableModel):
-    def __init__(self, parent, visibleList, dataList):
+    def __init__(self, parent, visibleList, dataList, determinableList):
         QtCore.QAbstractTableModel.__init__(self, parent)
         self.visibleList = visibleList
+        self.determinableList = determinableList
         self.dataList = dataList
         self.colors = [QtGui.QColor("#808080"), QtGui.QColor("#FFFFFF"), QtGui.QColor("#000000"),
                        QtGui.QColor("#FF0000")]
+        self.showDeterminable = True
 
     def flags(self, index):
         return QtCore.Qt.ItemIsEnabled
@@ -408,6 +416,8 @@ class MyTableModel(QtCore.QAbstractTableModel):
         value = self.visibleList[row][column]
         if not index.isValid():
             return None
+        elif role == QtCore.Qt.TextAlignmentRole:
+            return QtCore.Qt.AlignCenter
         elif role == QtCore.Qt.BackgroundRole:
             if value == 1:  # Visible
                 value = self.dataList[row][column]
@@ -416,6 +426,12 @@ class MyTableModel(QtCore.QAbstractTableModel):
                 else:
                     return QtGui.QBrush(QtGui.QColor(255, 0, 0, 25 * value))
             elif value == 0:
+                if self.showDeterminable:
+                    if self.determinableList[row][column] == 1:
+                        return QtGui.QBrush(QtGui.QColor(255, 215, 0, 100))
+                    elif self.determinableList[row][column] == 2:
+                        return QtGui.QBrush(QtGui.QColor(0, 0, 0, 100))
+                        # QtGui.QColor(QtCore.Qt.black)
                 return QtGui.QBrush(QtGui.QColor(30, 30, 30, 30))
             else:
                 return QtGui.QBrush(QtGui.QColor(0, 0, 200, 100))
