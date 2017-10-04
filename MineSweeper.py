@@ -15,9 +15,9 @@ class GameField(QtWidgets.QWidget):
         self.moves = 0
         self.messy = False
 
-        self.width = 10
-        self.height = 10
-        self.mines = 10
+        self.width = 50
+        self.height = 30
+        self.mines = 150
         self.remainingMines = 0
         self.showDeterminable = True
 
@@ -92,6 +92,14 @@ class GameField(QtWidgets.QWidget):
         rightLayout.addWidget(saveButton)
         loadButton = QtWidgets.QPushButton('Load')
         loadButton.pressed.connect(self.load)
+        rightLayout.addWidget(loadButton)
+
+        # ------------Save and load widgets -------#
+        saveButton = QtWidgets.QPushButton('SaveDummy')
+        saveButton.pressed.connect(self.saveDummy)
+        rightLayout.addWidget(saveButton)
+        loadButton = QtWidgets.QPushButton('LoadDummy')
+        loadButton.pressed.connect(self.loadDummy)
         rightLayout.addWidget(loadButton)
 
         # ------------New game widget ------------#
@@ -232,7 +240,15 @@ class GameField(QtWidgets.QWidget):
             self.m, self.s), open('savedPosition.FMS', 'wb'))
         self.messy = False
 
+    def saveDummy(self):
+        # Data matrix visible matrix total mines field width  field height   remaining mines   hours, minutes, seconds
+        pickle.dump((
+            self.dataList, self.visibleList, self.mines, self.width, self.height, self.remaining.text(), self.h,
+            self.m, self.s), open('savedPositionDummy.FMS', 'wb'))
+        self.messy = False
+
     def load(self):
+        # TODO FIX load and save to work with smart functionality
         dataList, visibleList = [], []
         if os.path.isfile('savedPosition.FMS'):
             (dataList, visibleList, self.mines, self.width, self.height, self.remainingMines, self.h, self.m,
@@ -244,13 +260,30 @@ class GameField(QtWidgets.QWidget):
         self.start(load=True)
         self.messy = False
 
+    def loadDummy(self):
+        dataList, visibleList = [], []
+        if os.path.isfile('savedPositionDummy.FMS'):
+            (dataList, visibleList, self.mines, self.width, self.height, self.remainingMines, self.h, self.m,
+             self.s) = pickle.load(open('savedPositionDummy.FMS', 'rb'))
+            self.rowsWidget.setText(str(self.height))
+            self.columnsWidget.setText(str(self.width))
+            self.minesWidget.setText(str(self.mines))
+
+        visibleList = [[0] * (self.width + 2) for _ in range(self.height + 2)]
+        self.gameStructure.determinableMatrix = [[0] * (self.width + 2) for _ in range(self.height + 2)]
+        self.gameStructure.determinable = 0
+
+        self.gameStructure.load(dataList, visibleList, self.mines)
+        self.start(load=True)
+        self.messy = False
+
     def start(self, load=False):
         try:
-            self.width, self.height = int(self.rowsWidget.text()), int(self.columnsWidget.text())
+            self.width, self.height = int(self.columnsWidget.text()), int(self.rowsWidget.text())
             self.mines = int(self.minesWidget.text())
-            if self.width > 40 or self.height > 30:
+            if self.width > 50 or self.height > 30:
                 QtWidgets.QMessageBox.warning(self, "Too big field",
-                                              "Cannot set width > 40 or height > 30.",
+                                              "Cannot set width > 50 or height > 30.",
                                               QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.NoButton)
                 return
             if self.mines >= self.width * self.height:
@@ -436,17 +469,17 @@ class MyTableModel(QtCore.QAbstractTableModel):
             else:
                 return QtGui.QBrush(QtGui.QColor(0, 0, 200, 100))
         elif role == QtCore.Qt.DisplayRole:
-            if value == 1:
+            #if value == 1:
                 value = self.dataList[row][column]
                 if value == -1:
                     value = 'X'
                 elif value == 0:
                     return ' '
                 return value
-            elif value == 0:
-                return None
-            else:
-                return 'P'
+            #elif value == 0:
+            #    return None
+            #else:
+            #    return 'P'
 
     def update(self):
         self.layoutAboutToBeChanged.emit()
