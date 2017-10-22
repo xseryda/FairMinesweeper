@@ -4,6 +4,7 @@ import sys
 import os
 import DataStructures
 import pickle
+import time
 
 
 class GameField(QtWidgets.QWidget):
@@ -15,16 +16,16 @@ class GameField(QtWidgets.QWidget):
         self.moves = 0
         self.messy = False
 
-        self.width = 50
-        self.height = 30
-        self.mines = 150
+        self.width = 30
+        self.height = 20
+        self.mines = 70
         self.remainingMines = 0
-        self.showDeterminable = True
 
         # Time counters #
         self.s = 0
         self.m = 0
         self.h = 0
+        self.timeSpeed = 1
 
         gameStructure = DataStructures.GameStructures(self.width, self.height, self.mines)
         self.gameStructure = gameStructure
@@ -174,16 +175,16 @@ class GameField(QtWidgets.QWidget):
         # self.tableView.updateGeometry()
 
     def time(self):
-        if self.s < 59:
-            self.s += 1
+        if self.s < 60-self.timeSpeed:
+            self.s += self.timeSpeed
         else:
             if self.m < 59:
-                self.s = 0
+                self.s -= 60-self.timeSpeed
                 self.m += 1
             elif self.m == 59 and self.h < 24:
                 self.h += 1
-                self.m = 0
-                self.s = 0
+                self.m -= 59
+                self.s -= 60-self.timeSpeed
             else:
                 self.timer.stop()
 
@@ -204,7 +205,13 @@ class GameField(QtWidgets.QWidget):
         self.timer.start(1000)
 
     def hint(self):
-        pass
+        if self.gameStructure.determinable == 0:
+            return
+        turnOff = self.tableModel.showDeterminable
+        self.tableModel.showDeterminable = False if turnOff else True
+        self.timeSpeed = 1 if turnOff else 3
+        self.s += 0 if turnOff else 3
+        self.tableModel.update()
         # TODO implement
 
     def loadTopResults(self):
@@ -236,8 +243,9 @@ class GameField(QtWidgets.QWidget):
     def save(self):
         # Data matrix visible matrix total mines field width  field height   remaining mines   hours, minutes, seconds
         pickle.dump((
-            self.dataList, self.visibleList, self.mines, self.width, self.height, self.remaining.text(), self.h,
-            self.m, self.s), open('savedPosition.FMS', 'wb'))
+            self.dataList, self.visibleList, self.determinableList, self.mines, self.width, self.height,
+            self.remaining.text(), self.gameStructure.determinable, self.h, self.m, self.s),
+            open('savedPosition.FMS', 'wb'))
         self.messy = False
 
     def saveDummy(self):
@@ -251,12 +259,14 @@ class GameField(QtWidgets.QWidget):
         # TODO FIX load and save to work with smart functionality
         dataList, visibleList = [], []
         if os.path.isfile('savedPosition.FMS'):
-            (dataList, visibleList, self.mines, self.width, self.height, self.remainingMines, self.h, self.m,
-             self.s) = pickle.load(open('savedPosition.FMS', 'rb'))
+            (dataList, visibleList, determinableList, self.mines, self.width, self.height, self.remainingMines,
+             determinable, self.h, self.m, self.s) = pickle.load(open('savedPosition.FMS', 'rb'))
             self.rowsWidget.setText(str(self.height))
             self.columnsWidget.setText(str(self.width))
             self.minesWidget.setText(str(self.mines))
-        self.gameStructure.load(dataList, visibleList, self.mines)
+        self.gameStructure.load(dataList, visibleList, determinableList, determinable, self.mines,
+                                self.width, self.height)
+        self.updateDeterminableLabel()
         self.start(load=True)
         self.messy = False
 
@@ -270,10 +280,9 @@ class GameField(QtWidgets.QWidget):
             self.minesWidget.setText(str(self.mines))
 
         visibleList = [[0] * (self.width + 2) for _ in range(self.height + 2)]
-        self.gameStructure.determinableMatrix = [[0] * (self.width + 2) for _ in range(self.height + 2)]
-        self.gameStructure.determinable = 0
 
-        self.gameStructure.load(dataList, visibleList, self.mines)
+        self.gameStructure.load(dataList, visibleList, [[0] * (self.width + 2) for _ in range(self.height + 2)], 0,
+                                self.mines, self.width, self.height)
         self.start(load=True)
         self.messy = False
 
@@ -345,6 +354,7 @@ class GameField(QtWidgets.QWidget):
                     self.gameWon()
 
                 self.tableModel.dataChanged.emit(index, index)
+                self.updateDeterminableLabel()
 
         except AttributeError:  # Right Click
             index = self.tableView.indexAt(index)
@@ -362,6 +372,9 @@ class GameField(QtWidgets.QWidget):
                     self.gameWon()
                 self.tableModel.dataChanged.emit(index, index)
                 # print(visibleListItem)
+
+    def updateDeterminableLabel(self):
+        self.labelPossible.setText('Possible to determine {} boxes'.format(self.gameStructure.determinable))
 
     def checkFlagWinCondition(self, remainingFlags):
         if remainingFlags != 0:
@@ -433,7 +446,7 @@ class MyTableModel(QtCore.QAbstractTableModel):
         self.dataList = dataList
         self.colors = [QtGui.QColor("#808080"), QtGui.QColor("#FFFFFF"), QtGui.QColor("#000000"),
                        QtGui.QColor("#FF0000")]
-        self.showDeterminable = True
+        self.showDeterminable = False
 
     def flags(self, index):
         return QtCore.Qt.ItemIsEnabled
@@ -483,8 +496,6 @@ class MyTableModel(QtCore.QAbstractTableModel):
 
     def update(self):
         self.layoutAboutToBeChanged.emit()
-        # custom_sort() is built into the data structure
-        #self.data_structure.custom_sort()
         self.layoutChanged.emit()
 
 
