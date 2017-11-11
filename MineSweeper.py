@@ -31,7 +31,8 @@ class GameField(QtWidgets.QWidget):
         self.gameStructure = gameStructure
         self.dataList = gameStructure.matrix
         self.visibleList = gameStructure.visibleMatrix
-        self.determinableList = gameStructure.determinableMatrix
+        self.VP = gameStructure.virtualPlayer
+        #self.determinableList = gameStructure.virtualPlayer._determinableMatrix
 
         self.setWindowTitle("Fair minesweeper")
 
@@ -72,7 +73,7 @@ class GameField(QtWidgets.QWidget):
         rightLayout.addLayout(remainingLayout)
 
         # -----------Possible to determine -----------------#
-        self.labelPossible = QtWidgets.QLabel('Possible to determine {} boxes'.format(self.gameStructure.determinable))
+        self.labelPossible = QtWidgets.QLabel('Possible to uncover {} boxes'.format(self.gameStructure.determinable))
         rightLayout.addWidget(self.labelPossible)
         buttonPossible = QtWidgets.QPushButton('Show determinable boxes')
         rightLayout.addWidget(buttonPossible)
@@ -147,12 +148,12 @@ class GameField(QtWidgets.QWidget):
 
         self.adjustSize()
         self.app.processEvents()
-        self.parent.adjustSize() # TODO should be called later to correctly resize
+        self.parent.adjustSize()  # TODO should be called later to correctly resize
         # self.parent.adjustSize()
 
     def initiateGameField(self):
         self.messy = False
-        self.tableModel = MyTableModel(self, self.visibleList, self.dataList, self.determinableList)
+        self.tableModel = MyTableModel(self, self.visibleList, self.dataList, self.VP)
         self.tableView.setModel(self.tableModel)
 
         for i in range(len(self.visibleList[0])):
@@ -167,24 +168,25 @@ class GameField(QtWidgets.QWidget):
         # Rewrite sizeHint function to return modified values?
         # self.parent.resize()
 
-        self.parent.setFixedSize((self.width+1)*30 + 225, (self.height+1)*30 + 18) # needed e.g. for making the field smaller
+        self.parent.setFixedSize((self.width + 1) * 30 + 225,
+                                 (self.height + 1) * 30 + 18)  # needed e.g. for making the field smaller
         # self.parent.setFixedSize(x + 225, y + 18)
         # self.parent.setFixedSize(x + 50, y + 18)
 
-        self.parent.adjustSize() # TODO should be called later to correctly resize
+        self.parent.adjustSize()  # TODO should be called later to correctly resize
         # self.tableView.updateGeometry()
 
     def time(self):
-        if self.s < 60-self.timeSpeed:
+        if self.s < 60 - self.timeSpeed:
             self.s += self.timeSpeed
         else:
             if self.m < 59:
-                self.s -= 60-self.timeSpeed
+                self.s -= 60 - self.timeSpeed
                 self.m += 1
             elif self.m == 59 and self.h < 24:
                 self.h += 1
                 self.m -= 59
-                self.s -= 60-self.timeSpeed
+                self.s -= 60 - self.timeSpeed
             else:
                 self.timer.stop()
 
@@ -243,7 +245,7 @@ class GameField(QtWidgets.QWidget):
     def save(self):
         # Data matrix visible matrix total mines field width  field height   remaining mines   hours, minutes, seconds
         pickle.dump((
-            self.dataList, self.visibleList, self.determinableList, self.mines, self.width, self.height,
+            self.dataList, self.visibleList, self.VP, self.mines, self.width, self.height,
             self.remaining.text(), self.gameStructure.determinable, self.h, self.m, self.s),
             open('savedPosition.FMS', 'wb'))
         self.messy = False
@@ -259,12 +261,14 @@ class GameField(QtWidgets.QWidget):
         # TODO FIX load and save to work with smart functionality
         dataList, visibleList = [], []
         if os.path.isfile('savedPosition.FMS'):
-            (dataList, visibleList, determinableList, self.mines, self.width, self.height, self.remainingMines,
+            (dataList, visibleList, VP, self.mines, self.width, self.height, self.remainingMines,
              determinable, self.h, self.m, self.s) = pickle.load(open('savedPosition.FMS', 'rb'))
             self.rowsWidget.setText(str(self.height))
             self.columnsWidget.setText(str(self.width))
             self.minesWidget.setText(str(self.mines))
-        self.gameStructure.load(dataList, visibleList, determinableList, determinable, self.mines,
+        else:
+            return
+        self.gameStructure.load(dataList, visibleList, VP, determinable, self.mines,
                                 self.width, self.height)
         self.updateDeterminableLabel()
         self.start(load=True)
@@ -312,7 +316,7 @@ class GameField(QtWidgets.QWidget):
                     self.remaining.setText(self.remainingMines)
                 self.dataList = self.gameStructure.matrix
                 self.visibleList = self.gameStructure.visibleMatrix
-                self.determinableList = self.gameStructure.determinableMatrix
+                self.VP = self.gameStructure.virtualPlayer
                 self.initiateGameField()
 
         except Exception as e:
@@ -374,7 +378,7 @@ class GameField(QtWidgets.QWidget):
                 # print(visibleListItem)
 
     def updateDeterminableLabel(self):
-        self.labelPossible.setText('Possible to determine {} boxes'.format(self.gameStructure.determinable))
+        self.labelPossible.setText('Possible to uncover {} boxes'.format(self.gameStructure.determinable))
 
     def checkFlagWinCondition(self, remainingFlags):
         if remainingFlags != 0:
@@ -439,10 +443,10 @@ class NewRecordDialog(QtWidgets.QDialog):
 
 
 class MyTableModel(QtCore.QAbstractTableModel):
-    def __init__(self, parent, visibleList, dataList, determinableList):
+    def __init__(self, parent, visibleList, dataList, VP):
         QtCore.QAbstractTableModel.__init__(self, parent)
         self.visibleList = visibleList
-        self.determinableList = determinableList
+        self.VP = VP
         self.dataList = dataList
         self.colors = [QtGui.QColor("#808080"), QtGui.QColor("#FFFFFF"), QtGui.QColor("#000000"),
                        QtGui.QColor("#FF0000")]
@@ -473,25 +477,25 @@ class MyTableModel(QtCore.QAbstractTableModel):
                     return QtGui.QBrush(QtGui.QColor(255, 0, 0, 25 * value))
             elif value == 0:
                 if self.showDeterminable:
-                    if self.determinableList[row][column] == 1:
+                    if self.VP[row, column] == 1:
                         return QtGui.QBrush(QtGui.QColor(255, 215, 0, 100))
-                    elif self.determinableList[row][column] == 2:
+                    elif self.VP[row, column] == 2:
                         return QtGui.QBrush(QtGui.QColor(0, 0, 0, 100))
                         # QtGui.QColor(QtCore.Qt.black)
                 return QtGui.QBrush(QtGui.QColor(30, 30, 30, 30))
             else:
                 return QtGui.QBrush(QtGui.QColor(0, 0, 200, 100))
         elif role == QtCore.Qt.DisplayRole:
-            #if value == 1:
-                value = self.dataList[row][column]
-                if value == -1:
-                    value = 'X'
-                elif value == 0:
-                    return ' '
-                return value
-            #elif value == 0:
+            # if value == 1:
+            value = self.dataList[row][column]
+            if value == -1:
+                value = 'X'
+            elif value == 0:
+                return ' '
+            return value
+            # elif value == 0:
             #    return None
-            #else:
+            # else:
             #    return 'P'
 
     def update(self):
