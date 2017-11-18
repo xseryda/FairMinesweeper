@@ -517,6 +517,8 @@ class GameStructures:
         return newMinesCandidates, removedMinesCandidates
 
     def processCandidates(self, candidates):
+        # TODO improve the recursion, do not check all possiblities
+        # TODO add randomness - now the first result gets chosen
         # print('PROCESS', candidates)
         minesToPlace = set()
 

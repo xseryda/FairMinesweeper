@@ -8,6 +8,18 @@ import time
 
 
 class GameField(QtWidgets.QWidget):
+    class ModifiedButton(QtWidgets.QPushButton):
+        def __init__(self, gameField, *args, **kwargs):
+            super(QtWidgets.QPushButton, self).__init__(*args, **kwargs)
+            self.gameField = gameField
+
+        def mousePressEvent(self, QMouseEvent):
+            self.setText('{}'.format(self.gameField.gameStructure.determinable))
+            self.gameField.s += 2
+
+        def mouseReleaseEvent(self, QMouseEvent):
+            self.setText('Number of uncoverable boxes')
+
     def __init__(self, parent, app):
         super(GameField, self).__init__(parent)
         self.parent = parent
@@ -32,7 +44,6 @@ class GameField(QtWidgets.QWidget):
         self.dataList = gameStructure.matrix
         self.visibleList = gameStructure.visibleMatrix
         self.VP = gameStructure.virtualPlayer
-        #self.determinableList = gameStructure.virtualPlayer._determinableMatrix
 
         self.setWindowTitle("Fair minesweeper")
 
@@ -73,11 +84,12 @@ class GameField(QtWidgets.QWidget):
         rightLayout.addLayout(remainingLayout)
 
         # -----------Possible to determine -----------------#
-        self.labelPossible = QtWidgets.QLabel('Possible to uncover {} boxes'.format(self.gameStructure.determinable))
-        rightLayout.addWidget(self.labelPossible)
-        buttonPossible = QtWidgets.QPushButton('Show determinable boxes')
-        rightLayout.addWidget(buttonPossible)
-        buttonPossible.pressed.connect(self.hint)
+        self.buttonUncoverable = self.ModifiedButton(self, 'Number of uncoverable boxes')
+        rightLayout.addWidget(self.buttonUncoverable)
+
+        self.buttonPossible = QtWidgets.QPushButton('Show determinable boxes')
+        rightLayout.addWidget(self.buttonPossible)
+        self.buttonPossible.pressed.connect(self.hint)
 
         # ------------Time widget ------------#
         self.s, self.m, self.h = 0, 0, 0
@@ -112,7 +124,7 @@ class GameField(QtWidgets.QWidget):
         self.rowsWidget.setMaxLength(2)
         self.rowsWidget.setFixedWidth(26)
         self.rowsWidget.setFont(font)
-        self.rowsWidget.setText('10')
+        self.rowsWidget.setText(str(self.height))
         labelx = QtWidgets.QLabel(' x ')
         labelx.setFont(font)
         self.columnsWidget = QtWidgets.QLineEdit()
@@ -120,7 +132,7 @@ class GameField(QtWidgets.QWidget):
         self.columnsWidget.setMaxLength(2)
         self.columnsWidget.setFixedWidth(26)
         self.columnsWidget.setFont(font)
-        self.columnsWidget.setText('10')
+        self.columnsWidget.setText(str(self.width))
         sizesLayout = QtWidgets.QHBoxLayout()
         sizesLayout.addWidget(label)
         sizesLayout.addWidget(self.rowsWidget)
@@ -135,7 +147,7 @@ class GameField(QtWidgets.QWidget):
         self.minesWidget.setMaxLength(3)
         self.minesWidget.setFixedWidth(40)
         self.minesWidget.setFont(font)
-        self.minesWidget.setText('20')
+        self.minesWidget.setText(str(self.mines))
         minesLayout = QtWidgets.QHBoxLayout()
         minesLayout.addWidget(labelMines)
         minesLayout.addWidget(self.minesWidget)
@@ -212,9 +224,12 @@ class GameField(QtWidgets.QWidget):
         turnOff = self.tableModel.showDeterminable
         self.tableModel.showDeterminable = False if turnOff else True
         self.timeSpeed = 1 if turnOff else 3
+        if turnOff:
+            self.buttonPossible.setText('Show determinable boxes')
+        else:
+            self.buttonPossible.setText('Hide determinable boxes')
         self.s += 0 if turnOff else 3
         self.tableModel.update()
-        # TODO implement
 
     def loadTopResults(self):
         self.topResults = {}
@@ -270,7 +285,6 @@ class GameField(QtWidgets.QWidget):
             return
         self.gameStructure.load(dataList, visibleList, VP, determinable, self.mines,
                                 self.width, self.height)
-        self.updateDeterminableLabel()
         self.start(load=True)
         self.messy = False
 
@@ -358,7 +372,6 @@ class GameField(QtWidgets.QWidget):
                     self.gameWon()
 
                 self.tableModel.dataChanged.emit(index, index)
-                self.updateDeterminableLabel()
 
         except AttributeError:  # Right Click
             index = self.tableView.indexAt(index)
@@ -376,9 +389,6 @@ class GameField(QtWidgets.QWidget):
                     self.gameWon()
                 self.tableModel.dataChanged.emit(index, index)
                 # print(visibleListItem)
-
-    def updateDeterminableLabel(self):
-        self.labelPossible.setText('Possible to uncover {} boxes'.format(self.gameStructure.determinable))
 
     def checkFlagWinCondition(self, remainingFlags):
         if remainingFlags != 0:
