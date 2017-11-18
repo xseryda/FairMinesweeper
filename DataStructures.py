@@ -22,7 +22,6 @@ class VirtualPlayer:
         self._determinableMatrix = [[0] * (width + 2) for _ in range(height + 2)]  # matrix has safety zone around
         self._boxesToSolve = [[None] * (width + 2) for _ in range(height + 2)]  # matrix has safety zone around
 
-
     def __getitem__(self, pos):
         i, j = pos
         return self._determinableMatrix[i][j]
@@ -83,11 +82,14 @@ class VirtualPlayer:
         # print (box.unknownSet, box.toSolve, boxi, boxj)
         changed = False
         determinable = 0
+        newMinesCandidates, removedMinesCandidates = [], []
         if box.toSolve == len(box.unknownSet): # everything is a mine
             changed = True
             for coord in box.unknownSet:
                 i = (coord-1) // self.width # 110 = row 10, column 10
                 j = (coord-1) % self.width + 1
+                newMinesCandidates.append([i, j])
+                #print (i, j)
                 self[i, j] = 1
             box.solved = True
             # del box
@@ -98,6 +100,8 @@ class VirtualPlayer:
                 j = (coord-1) % self.width + 1
                 if self[i, j] == 0:
                     determinable += 1
+                    removedMinesCandidates.append([i, j])
+                #print (i, j)
                 self[i, j] = 2
             box.solved = True
             # del box
@@ -129,12 +133,14 @@ class VirtualPlayer:
                                         for coord in AmB:
                                             i = (coord - 1) // self.width  # 110 = row 10, column 10
                                             j = (coord - 1) % self.width + 1
+                                            newMinesCandidates.append([i, j])
                                             self[i, j] = 1 #mine
                                         for coord in BmA:
                                             i = (coord - 1) // self.width  # 110 = row 10, column 10
                                             j = (coord - 1) % self.width + 1
                                             if self[i, j] == 0:
                                                 determinable += 1
+                                            removedMinesCandidates.append([i, j])
                                             self[i, j] = 2 #empty
                                         box.solved = True
                                         Neighbox.unknownSet = AaB # intersection
@@ -143,7 +149,7 @@ class VirtualPlayer:
                         except IndexError:  # safety zone not big enough
                             pass
 
-        return changed, determinable
+        return changed, determinable, newMinesCandidates, removedMinesCandidates
 
     def checkByTrying(self, listOfBoxes):
         pass
@@ -161,13 +167,13 @@ class GameStructures:
         self.determinable = 0
         self.uncovered = 0
 
-        # self.generateDummy()
+        #self.generateDummy()
         self.generateMatrix(self.freeBoxes, width, height, mines)
 
         self.freeBoxes -= mines
         self.mines = mines
 
-        self.virtualPlayer = VirtualPlayer(width, height)
+        self.virtualPlayer = VirtualPlayer(self.width, self.height)
 
     def load(self, matrix, visibleMatrix, VP, determinable, mines, width, height):
         self.matrix = matrix
@@ -183,15 +189,11 @@ class GameStructures:
 
     def generateDummy(self):
 
-        self.width = 4
+        self.width = 5
         self.height = 2
 
-        self.width = 6
-        self.height = 7
-        self.matrix = [[-5, -5, -5, -5, -5, -5, -5, -5], [-5, 1, 1, -1, 1, 1, -1, -5], [-5, 1, 1, 1, 1, 1, 1, -5],
-                       [-5, 2, 1, 0, 0, 0, 0, -5], [-5, -1, 2, 1, 0, 0, 0, -5],
-                       [-5, 3, -1, 2, 1, 1, 0, -5], [-5, -1, 3, 2, -1, 1, 0, -5], [-5, -1, 2, 1, 1, 1, 0, -5],
-                       [-5, -5, -5, -5, -5, -5, -5, -5]]
+        self.matrix = [[-5, -5, -5, -5, -5, -5, -5], [-5, -1, 1, 1, -1, 1, -5], [-5, 1, 1, 1, 1, 1, -5],
+                       [-5, -5, -5, -5, -5, -5, -5]]
 
         self.visibleMatrix = [[0] * (self.width + 2) for _ in range(self.height + 2)]
 
@@ -285,7 +287,7 @@ class GameStructures:
             VP[i, j] = 2
             placeMine = False
             if self.matrix[i][j] == -1:  # we have to move this mine, because it was not determinable
-                self.calculateNeighbours(i, j)
+                self.calculateNeighbours(i, j) #remove the mine and calculate the correct number
                 self.moveMine(i, j)
                 placeMine = True
 
@@ -301,7 +303,7 @@ class GameStructures:
             if self.matrix[i][j] == 0:
                 if self.uncoverWave(i, j):
                     VP.updateUnknownSets()
-            self.determinableWave()
+            newMinesCandidates, removedMinesCandidates = self.determinableWave()
             return True
 
     def getUnknownSet(self, i, j):
@@ -368,74 +370,92 @@ class GameStructures:
         return modified
 
     def moveMine(self, fromX, fromY):
-        VP = self.virtualPlayer
-        # TODO opravit
+        newMinesCandidates, removedMinesCandidates = self.determinableWave()
+        fixed = -1 #need to add one mine
+        for mine in newMinesCandidates:
+            i, j = mine
+            if self.matrix[i][j] != -1:
+                fixed += 1
+                self.matrix[i][j] = -1
+                self.changeNeighbourNumbers(i, j)
+                # print('REAL CANDIDATE for mine', i, j)
+        for mine in removedMinesCandidates:
+            i, j = mine
+            if self.matrix[i][j] == -1:
+                fixed -= 1
+                self.changeNeighbourNumbers(i, j, -1)
+                self.calculateNeighbours(i, j)
+                # print('REAL CANDIDATE for empty', i, j)
 
-        for i in range(1, self.height + 1):
-            for j in range(1, self.width + 1):
-                if self.matrix[i][j] > -1 and VP[i, j] == 1:  # here should be mine, but is not
-                    print('Situation 1')
-                    self.matrix[i][j] = -1
-                    self.changeNeighbourNumbers(i, j)
-                    # fix the original mine neighbours
-                    self.changeNeighbourNumbers(fromX, fromY, amount=-1)
-                    return True
+        try:
+            if fixed == 0:
+                raise doneException
+            VP = self.virtualPlayer
+            # TODO opravit
 
-        candidates = []  # some fields are missing mine around
-        antiCandidates = []  # some fields uncovered but not missing a mine
-        for i in range(1, self.height + 1):
-            for j in range(1, self.width + 1):
-                if self.visibleMatrix[i][j] == 1 and self.matrix[i][j] > 0:  # number visible
-                    candidate = []
-                    antiCandidate = []
-                    neighbourMines = 0
-                    for k in range(i - 1, i + 2):
-                        for l in range(j - 1, j + 2):
-                            if self.matrix[k][l] == -1:
-                                neighbourMines += 1
-                            if VP[i, j] == 0 and self.matrix[k][l] > -1:  # nondeterminable, nonboundary, nonmine
-                                candidate.append(k * self.width + l)
-
-                    if neighbourMines < self.matrix[i][j]:
-                        # print ('NEED CHANGE')
-                        candidates.append(candidate)
-                    else:
-                        antiCandidates += candidate
-        # TODO myslenka s antiCandidaty je spatna. Nekdy je potreba posunout i jine miny
-        #   Podivat se na vsechna pole kolem odkrytych a rozmistit miny tak, aby to sedelo
-        #   pole po presunute mine je nutne prazdne, cislo mu dopocitej az po presunuti a doplneni min
-        newMines = self.processCandidates(candidates, set(antiCandidates))
-
-        if newMines:
-            self.placeMines(newMines)
-            self.removeMines(len(newMines) - 1, antiCandidates)
-            # fix the original mine neighbours
-            self.changeNeighbourNumbers(fromX, fromY, amount=-1)
-            return
-
-        if not candidates:
             for i in range(1, self.height + 1):
                 for j in range(1, self.width + 1):
-                    if VP[i, j] == 0 and self.matrix[i][j] > -1:
-                        possibleCandidate = True
+                    if self.matrix[i][j] > -1 and VP[i, j] == 1:  # here should be mine, but is not
+                        print('Situation 1')
+                        self.matrix[i][j] = -1
+                        self.changeNeighbourNumbers(i, j)
+                        # fix the original mine neighbours
+                        self.changeNeighbourNumbers(fromX, fromY, amount=-1)
+                        return True
+
+            candidates = []  # some fields are missing mine around
+            antiCandidates = []  # some fields uncovered but not missing a mine
+            for i in range(1, self.height + 1):
+                for j in range(1, self.width + 1):
+                    if self.visibleMatrix[i][j] == 1 and self.matrix[i][j] > 0:  # number visible
+                        candidate = []
+                        antiCandidate = []
+                        neighbourMines = 0
                         for k in range(i - 1, i + 2):
-                            if not possibleCandidate:
-                                break
                             for l in range(j - 1, j + 2):
-                                if self.visibleMatrix[k][l] == 1 and self.matrix[k][l] > 0:  # number visible
-                                    possibleCandidate = False
+                                if self.matrix[k][l] == -1:
+                                    neighbourMines += 1
+                                if VP[i, j] == 0 and self.matrix[k][l] > -1:  # nondeterminable, nonboundary, nonmine
+                                    candidate.append(k * self.width + l)
+
+                        if neighbourMines < self.matrix[i][j]:
+                            # print ('NEED CHANGE')
+                            candidates.append(candidate)
+                        else:
+                            antiCandidates += candidate
+            # TODO myslenka s antiCandidaty je spatna. Nekdy je potreba posunout i jine miny
+            #   Podivat se na vsechna pole kolem odkrytych a rozmistit miny tak, aby to sedelo
+            #   pole po presunute mine je nutne prazdne, cislo mu dopocitej az po presunuti a doplneni min
+            newMines = self.processCandidates(candidates, set(antiCandidates))
+
+            if newMines:
+                self.placeMines(newMines)
+                self.removeMines(len(newMines) - 1, antiCandidates)
+                raise doneException
+
+            if not candidates:
+                for i in range(1, self.height + 1):
+                    for j in range(1, self.width + 1):
+                        if VP[i, j] == 0 and self.matrix[i][j] > -1:
+                            possibleCandidate = True
+                            for k in range(i - 1, i + 2):
+                                if not possibleCandidate:
                                     break
-                        if possibleCandidate:
-                            candidates.append(i * self.width + j)
-                            # print ('CANDIDATES', candidates)
+                                for l in range(j - 1, j + 2):
+                                    if self.visibleMatrix[k][l] == 1 and self.matrix[k][l] > 0:  # number visible
+                                        possibleCandidate = False
+                                        break
+                            if possibleCandidate:
+                                candidates.append(i * self.width + j)
+                                # print ('CANDIDATES', candidates)
 
-        if not candidates:
-            print('ERROR')
-        else:
-            self.placeMines([candidates.pop()])
-
-        # fix the original mine neighbours
-        self.changeNeighbourNumbers(fromX, fromY, amount=-1)
+            if not candidates:
+                print('ERROR')
+            else:
+                self.placeMines([candidates.pop()])
+        except doneException as e:
+            # fix the original mine neighbours
+            self.changeNeighbourNumbers(fromX, fromY, amount=-1)
 
     def placeMines(self, newMines):
         for newMine in newMines:
@@ -473,6 +493,8 @@ class GameStructures:
             return
 
     def determinableWave(self):
+        newMinesCandidates, newMines = [], []
+        removedMinesCandidates, removedMines = [], []
         VP = self.virtualPlayer
         VP.updateUnknownSets()
         changed = True
@@ -485,10 +507,13 @@ class GameStructures:
                         box = VP.getBox(i, j)
                         if box and box.modified and not box.solved:
                             # print (i,j)
-                            newChange, determinable = VP.processBox(box, i, j)
+                            newChange, determinable, newMines, removedMines = VP.processBox(box, i, j)
                             changed += newChange
                             self.determinable += determinable
+                            newMinesCandidates += newMines
+                            removedMinesCandidates += removedMines
             VP.updateUnknownSets()
+        return newMinesCandidates, removedMinesCandidates
 
     def processCandidates(self, candidates, antiCandidates):
         newMines = []
