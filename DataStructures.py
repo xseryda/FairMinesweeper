@@ -420,7 +420,7 @@ class GameStructures:
                                         possibleCandidate = False
                                         break
                             if possibleCandidate:
-                                candidates.append(i * self.width + j)
+                                candidates.add(i * self.width + j)
                                 # print ('CANDIDATES', candidates)
 
             if not candidates:

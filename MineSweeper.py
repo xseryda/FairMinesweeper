@@ -111,10 +111,10 @@ class GameField(QtWidgets.QWidget):
         # ------------Save and load widgets -------#
         saveButton = QtWidgets.QPushButton('SaveDummy')
         saveButton.pressed.connect(self.saveDummy)
-        rightLayout.addWidget(saveButton)
+        #rightLayout.addWidget(saveButton)
         loadButton = QtWidgets.QPushButton('LoadDummy')
         loadButton.pressed.connect(self.loadDummy)
-        rightLayout.addWidget(loadButton)
+        #rightLayout.addWidget(loadButton)
 
         # ------------New game widget ------------#
         label = QtWidgets.QLabel('Set field size')
@@ -243,9 +243,10 @@ class GameField(QtWidgets.QWidget):
                     self.topResults[line[0] + ':' + line[1] + ':' + line[2]] = (
                         ((int(line[3]) * 60) + int(line[4])) * 60 + int(line[5]), line[6])  # total time spent, name
             except:
-                QtWidgets.QMessageBox.warning(self, "Load failure",
-                                              "Could not load top scores from file topScores.FMSr.",
-                                              QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.NoButton)
+                pass
+                # QtWidgets.QMessageBox.warning(self, "Load failure",
+                #                               "Could not load top scores from file topScores.FMSr.",
+                #                               QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.NoButton)
 
     def saveTopResults(self):
         with open('topScores.FMSr', 'w') as outfile:
@@ -488,7 +489,8 @@ class MyTableModel(QtCore.QAbstractTableModel):
             elif value == 0:
                 if self.showDeterminable:
                     if self.VP[row, column] == 1:
-                        return QtGui.QBrush(QtGui.QColor(255, 215, 0, 100))
+                        #return QtGui.QBrush(QtGui.QColor(255, 215, 0, 100))
+                        return QtGui.QBrush(QtGui.QColor(0, 0, 0, 100))
                     elif self.VP[row, column] == 2:
                         return QtGui.QBrush(QtGui.QColor(0, 0, 0, 100))
                         # QtGui.QColor(QtCore.Qt.black)
@@ -496,17 +498,17 @@ class MyTableModel(QtCore.QAbstractTableModel):
             else:
                 return QtGui.QBrush(QtGui.QColor(0, 0, 200, 100))
         elif role == QtCore.Qt.DisplayRole:
-            # if value == 1:
-            value = self.dataList[row][column]
-            if value == -1:
-                value = 'X'
+            if value == 1:
+                value = self.dataList[row][column]
+                if value == -1:
+                    value = 'X'
+                elif value == 0:
+                    return ' '
+                return value
             elif value == 0:
-                return ' '
-            return value
-            # elif value == 0:
-            #    return None
-            # else:
-            #    return 'P'
+                return None
+            else:
+                return 'P'
 
     def update(self):
         self.layoutAboutToBeChanged.emit()
