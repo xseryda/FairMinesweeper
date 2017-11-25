@@ -159,34 +159,25 @@ class GameField(QtWidgets.QWidget):
         layout.addLayout(rightLayout)
 
         self.adjustSize()
-        self.app.processEvents()
-        self.parent.adjustSize()  # TODO should be called later to correctly resize
-        # self.parent.adjustSize()
+        self.parent.adjustSize()
+        self.setLayout(layout)
 
     def initiateGameField(self):
         self.messy = False
         self.tableModel = MyTableModel(self, self.visibleList, self.dataList, self.VP)
         self.tableView.setModel(self.tableModel)
 
-        for i in range(len(self.visibleList[0])):
+        for i in range(len(self.dataList[0])):
             self.tableView.setColumnWidth(i, 30)
+        for i in range(len(self.dataList)):
+            self.tableView.setRowHeight(i, 30)
+
         self.tableView.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
 
-        self.tableView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.tableView.setFixedSize(self.tableView.sizeHint())
 
-        # x, y = self.tableView.sizeHint().width(), self.tableView.sizeHint().height()
-        # print (self.width,self.height)
-        # Rewrite sizeHint function to return modified values?
-        # self.parent.resize()
-
-        self.parent.setFixedSize((self.width + 1) * 30 + 225,
-                                 (self.height + 1) * 30 + 18)  # needed e.g. for making the field smaller
-        # self.parent.setFixedSize(x + 225, y + 18)
-        # self.parent.setFixedSize(x + 50, y + 18)
-
-        self.parent.adjustSize()  # TODO should be called later to correctly resize
-        # self.tableView.updateGeometry()
+        self.adjustSize()
+        self.parent.adjustSize()
 
     def time(self):
         if self.s < 60 - self.timeSpeed:
@@ -451,6 +442,16 @@ class NewRecordDialog(QtWidgets.QDialog):
 
         mainLayout.addLayout(layout)
         self.setLayout(mainLayout)
+
+
+# TODO REMOVE? Not needed?
+class MyTableView(QtWidgets.QTableView):
+    def sizeHint(self):
+        horizontal = self.horizontalHeader()
+        vertical = self.verticalHeader()
+        frame = self.frameWidth() * 2
+        return QtCore.QSize(horizontal.length() + vertical.width() + frame,
+                            vertical.length() + horizontal.height() + frame)
 
 
 class MyTableModel(QtCore.QAbstractTableModel):
