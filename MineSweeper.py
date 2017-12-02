@@ -33,6 +33,8 @@ class GameField(QtWidgets.QWidget):
         self.mines = 70
         self.remainingMines = 0
 
+        self.movesHistory = []
+
         # Time counters #
         self.s = 0
         self.m = 0
@@ -249,12 +251,13 @@ class GameField(QtWidgets.QWidget):
                 key = key.replace(':', '\t') + '\t'
                 outfile.write(key + '\t'.join((str(h), str(m), str(s))) + '\t' + name + '\n')
 
-    def save(self):
+    def save(self, debug=False):
         # Data matrix visible matrix total mines field width  field height   remaining mines   hours, minutes, seconds
+        fileName = 'savedPosition.FMS' if not debug else 'debugSavedPosition.FMS'
         pickle.dump((
-            self.dataList, self.visibleList, self.VP, self.mines, self.width, self.height,
+            self.dataList, self.visibleList, self.VP, self.mines, self.width, self.height, self.movesHistory,
             self.remaining.text(), self.gameStructure.determinable, self.h, self.m, self.s),
-            open('savedPosition.FMS', 'wb'))
+            open(fileName, 'wb'))
         self.messy = False
 
     def saveDummy(self):
@@ -268,7 +271,7 @@ class GameField(QtWidgets.QWidget):
         # TODO FIX load and save to work with smart functionality
         dataList, visibleList = [], []
         if os.path.isfile('savedPosition.FMS'):
-            (dataList, visibleList, VP, self.mines, self.width, self.height, self.remainingMines,
+            (dataList, visibleList, VP, self.mines, self.width, self.height, self.movesHistory, self.remainingMines,
              determinable, self.h, self.m, self.s) = pickle.load(open('savedPosition.FMS', 'rb'))
             self.rowsWidget.setText(str(self.height))
             self.columnsWidget.setText(str(self.width))
@@ -342,7 +345,8 @@ class GameField(QtWidgets.QWidget):
                                                   QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.NoButton)
             elif visibleListItem == 0:
                 self.messy = True  # unsaved change
-
+                self.movesHistory.append([row, column])
+                self.save(debug=True)
                 self.moves += 1
 
                 if not self.gameStructure.uncoverBox(row, column):  # You LOST
