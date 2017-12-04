@@ -239,6 +239,7 @@ class GameStructures:
                 matrix[i][j] -= 1  # set mines to -1 and free spaces to 0
 
         self.matrix = matrix
+        self.matrixOrig = list(matrix) #copy
         self.visibleMatrix = visibleMatrix
 
         for i in range(1, height + 1):

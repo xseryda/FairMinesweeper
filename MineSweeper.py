@@ -254,8 +254,9 @@ class GameField(QtWidgets.QWidget):
     def save(self, debug=False):
         # Data matrix visible matrix total mines field width  field height   remaining mines   hours, minutes, seconds
         fileName = 'savedPosition.FMS' if not debug else 'debugSavedPosition.FMS'
+        matrixToSave = self.gameStructure.matrixOrig if debug else self.dataList
         pickle.dump((
-            self.dataList, self.visibleList, self.VP, self.mines, self.width, self.height, self.movesHistory,
+            matrixToSave, self.visibleList, self.VP, self.mines, self.width, self.height, self.movesHistory,
             self.remaining.text(), self.gameStructure.determinable, self.h, self.m, self.s),
             open(fileName, 'wb'))
         self.messy = False
